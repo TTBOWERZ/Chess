@@ -365,10 +365,11 @@ public:
         }
         return false;
     };
-    /*for move edit to make better use of djikstras alg */
+
     Move<Pos> minimax(int depth, bool minimize)
     {
         Move<Pos> best_move;
+        Move<Pos> option;
         best_move.score = -1000000 + 2000000 * minimize;
         if (0 == depth)
         {
@@ -384,12 +385,19 @@ public:
             {
                 chessBoard branch = *this;
                 branch.makeMove(from.first, *j);
-                Move<Pos> option = branch.minimax(depth - 1, !minimize);
-                if ((option.score > best_move.score && !minimize) || (option.score < best_move.score && minimize))
+                if (option.score > best_move.score && !minimize)
                 {
+                    option = branch.minimax(depth-1, minimize);
                     best_move.score = option.score;
                     best_move.from = from.first;
                     best_move.to = *j;
+                }
+                if(option.score < best_move.score && minimize){
+                    option = branch.minimax(depth - 1, !minimize);
+                    best_move.score = option.score;
+                    best_move.from = from.first;
+                    best_move.to = *j;
+
                 }
             }
             delete i;
@@ -426,7 +434,7 @@ private:
     std::map<Pos, piece> &PC_Pieces() { return play == player::white ? white_pieces : black_pieces; };
     std::map<Pos, piece> &oppPieces() { return play == player::white ? black_pieces : white_pieces; };
     std::map<piece, int> pieceV{
-        {chessBoard::piece::King, 10000},
+        {chessBoard::piece::King, 100},
         {chessBoard::piece::Queen, 9},
         {chessBoard::piece::Pawn, 1},
         {chessBoard::piece::Bishop, 3},
