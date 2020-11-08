@@ -370,6 +370,7 @@ public:
     {
         Move<Pos> best_move;
         Move<Pos> option;
+        chessBoard branch = *this;
         best_move.score = -1000000 + 2000000 * minimize;
         if (0 == depth)
         {
@@ -383,7 +384,6 @@ public:
             vertex<Pos>::edgeIterator j;
             for (j = i->begin(); j != i->end(); j++)
             {
-                chessBoard branch = *this;
                 branch.makeMove(from.first, *j);
                 if (option.score > best_move.score && !minimize)
                 {
