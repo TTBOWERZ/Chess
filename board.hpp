@@ -103,11 +103,21 @@ public:
         auto isOwn = [&](int dx, int dy) -> bool { return PC_Pieces().count(Pos(from, dx, dy)); };
         auto isOpponent = [&](int dx, int dy) -> bool { return oppPieces().count(Pos(from, dx, dy)); };
         auto isInsideBoard = [&](int dx, int dy) -> bool { Pos p(from,dx,dy); return p.x < 9 && p.x > 0 && p.y < 9 && p.y > 0; };
-        auto isFree = [&](int dx, int dy) -> bool { return !isOwn(dx, dy) && isInsideBoard(dx, dy) && !isOpponent(dx, dy); };
+        auto isFree = [&](int dx, int dy) -> bool {
+            if (isOwn(dx, dy) || !isInsideBoard(dx, dy))
+            {
+                return false;
+            }
+            return true;
+        };
 
         auto addMove = [&](int dx, int dy) -> bool {
             if (isFree(dx, dy) || isOpponent(dx, dy))
             {
+                /*  if (kingPath(from, dx, dy))
+                {
+                    pieceV.at(piece::King) = 100000;
+                }*/
                 moves->addEdge(Pos(from, dx, dy));
                 return true;
             }
@@ -163,7 +173,7 @@ public:
                 }
                 break;
             }
-        case piece::Knight:
+        case piece::Knight: // Knight position tracker start {2,1}{7,1} or {2,8}{7,8}
             addMove(-2, -1);
             addMove(-2, 1);
             addMove(2, -1);
@@ -203,18 +213,22 @@ public:
                 break;
             }
 
-        case piece::Bishop:
-            for (int n = 1; n < 9 && addMove(n, n) && !isOpponent(n, n); ++n)
+        case piece::Bishop: // needed: coordinants to track bishop start {6,8}{3,8} white or {3,1}{6,1} black
+            for (int n = 1; n < 9 && !isOpponent(n, n); ++n)
             {
+                addMove(n, n);
             }
-            for (int n = 1; n < 9 && addMove(n, -n) && !isOpponent(n, -n); ++n)
+            for (int n = 1; n < 9 && !isOpponent(n, -n); ++n)
             {
+                addMove(n, -n);
             }
-            for (int n = 1; n < 9 && addMove(-n, n) && !isOpponent(-n, n); ++n)
+            for (int n = 1; n < 9 && !isOpponent(-n, n); ++n)
             {
+                addMove(-n, n);
             }
-            for (int n = 1; n < 9 && addMove(-n, -n) && !isOpponent(-n, -n); ++n)
+            for (int n = 1; n < 9 && !isOpponent(-n, -n); ++n)
             {
+                addMove(-n, -n);
             }
             break;
         }
@@ -302,7 +316,6 @@ public:
         {
             printHelp();
             move = "";
-            std::cout << "Bad Move\n";
             goto illegalmove;
         }
         if (move == "c")
@@ -310,7 +323,6 @@ public:
             show_coordinates = !show_coordinates;
             printBoard();
             move = "";
-            std::cout << "Bad Move\n";
             goto illegalmove;
         }
 
@@ -318,7 +330,6 @@ public:
         {
             printBoard();
             move = "";
-            std::cout << "Bad Move\n";
             goto illegalmove;
         }
         Pos from(-1, -1), to(-1, -1);
@@ -329,7 +340,7 @@ public:
             to.x = move[2] - '0';
             to.y = move[3] - '0';
         }
-        if (!makeMove(from, to))
+        if (!makeMove(from, to)) // chess board issue 2, user peices make illegal moves
         {
             std::cout << "* Illegal move" << std::endl;
             move = "";
@@ -358,13 +369,21 @@ public:
     {
         for (auto &p : PC_Pieces())
         {
-            if (p.second == piece::King)
+            if (p.second == piece::King) // instead check if possible move 1 ahead is 4
             {
                 return true;
             }
-        }
+        } // add condition for end game if King checked twice
         return false;
     };
+    /* bool kingPath(const Pos &from, int dx, int dy)
+    {
+        if (oppPieces().at(Pos(from, dx, dy)) == piece::King) // instead check if possible move 1 ahead is 4
+        {
+            return true;
+        }
+        return false;
+    };*/
 
     Move<Pos> minimax(int depth, bool minimize)
     {
@@ -387,17 +406,17 @@ public:
                 branch.makeMove(from.first, *j);
                 if (option.score > best_move.score && !minimize)
                 {
-                    option = branch.minimax(depth-1, minimize);
+                    option = branch.minimax(depth - 1, minimize);
                     best_move.score = option.score;
                     best_move.from = from.first;
                     best_move.to = *j;
                 }
-                if(option.score < best_move.score && minimize){
+                if (option.score < best_move.score && minimize)
+                {
                     option = branch.minimax(depth - 1, !minimize);
                     best_move.score = option.score;
                     best_move.from = from.first;
                     best_move.to = *j;
-
                 }
             }
             delete i;
@@ -429,12 +448,17 @@ private:
     };
     // myStack<Pos> stacker;
     // vertex<Pos> *vert;
+    std::string Knight[4] = {"21", "71", "28", "78"}; // used to track Knight pos for intelligent movement
+                                                      // not yet implemented
+    std::string Bishop[4] = {"31", "61", "38", "68"}; // used to track Bishop pos for intelligent movement
+                                                      // not yet implemented
     bool show_coordinates = false;
     std::map<Pos, piece> white_pieces, black_pieces;
     std::map<Pos, piece> &PC_Pieces() { return play == player::white ? white_pieces : black_pieces; };
     std::map<Pos, piece> &oppPieces() { return play == player::white ? black_pieces : white_pieces; };
     std::map<piece, int> pieceV{
-        {chessBoard::piece::King, 100},
+        // attack values
+        {chessBoard::piece::King, 4},
         {chessBoard::piece::Queen, 9},
         {chessBoard::piece::Pawn, 1},
         {chessBoard::piece::Bishop, 3},
