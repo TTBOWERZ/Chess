@@ -78,30 +78,32 @@ public:
     {
         vertex<Pos> *allowed = new vertex<Pos>;
         vertex<Pos>::edgeIterator item;
+        
         allowed = possibleMoves(from);
         bool mulligan = false;
-
         if (allowed->begin() == allowed->end())
         {
             return false;
         }
-        // kind of trash solution
         item = allowed->begin();
         while (item != NULL)
         {
-            if(to == *item){
+            if (to == *item)
+            {
                 mulligan = true;
                 break;
             }
             item++;
         }
-        if(mulligan == true){
-            // note for future ref if mem leak occurs
+        if (mulligan == true)
+        {
+            // actual peice movement
             oppPieces().erase(to);
             PC_Pieces()[to] = PC_Pieces()[from];
             PC_Pieces().erase(from);
             /*promotes paws to queen if @ end */
-            if ((PC_Pieces()[to] == piece::Pawn) && (to.y == 1 || to.y == 8)){
+            if ((PC_Pieces()[to] == piece::Pawn) && (to.y == 1 || to.y == 8))
+            {
                 PC_Pieces()[to] = piece::Queen;
             }
             flipTurn();
@@ -117,10 +119,11 @@ public:
         auto isOpponent = [&](int dx, int dy) -> bool { return oppPieces().count(Pos(from, dx, dy)); };
         auto isInsideBoard = [&](int dx, int dy) -> bool { Pos p(from,dx,dy); return p.x < 9 && p.x > 0 && p.y < 9 && p.y > 0; };
         auto isFree = [&](int dx, int dy) -> bool {
-            if (isOwn(dx, dy) || !isInsideBoard(dx, dy))
+            if (isOwn(dx, dy) || !isInsideBoard(dx, dy) || isOpponent(dx, dy))
             {
                 return false;
             }
+            
             return true;
         };
 
@@ -148,11 +151,11 @@ public:
         case piece::Pawn:
             if (play == player::white)
             {
-                if (isFree(0, -1))
+                if (isFree(0, -1) && !isOpponent(0, -1))
                 {
                     addMove(0, -1);
                 }
-                if (isFree(0, -1) && isFree(0, -2) && from.y == 7)
+                if (isFree(0, -1) && isFree(0, -2) && from.y == 7 && !isOpponent(0, -2))
                 {
                     addMove(0, -2);
                 }
@@ -168,11 +171,11 @@ public:
             }
             if (play == player::black)
             {
-                if (isFree(0, 1))
+                if (isFree(0, 1) && !isOpponent(0, -1))
                 {
                     addMove(0, 1);
                 }
-                if (isFree(0, 1) && isFree(0, 2) && from.y == 2)
+                if (isFree(0, 1) && isFree(0, 2) && from.y == 2 && !isOpponent(0, -1))
                 {
                     addMove(0, 2);
                 }
@@ -202,24 +205,31 @@ public:
             {
                 for (auto dx : {-1, 0, 1})
                 {
-                    addMove(dy, dx);
+                    if (isFree(dy, dx))
+                    {
+                        addMove(dy, dx);
+                    }
                 }
             }
             break;
 
         case piece::Queen:
         case piece::Rook:
-            for (int n = 1; n < 9 && addMove(0, n) && !isOpponent(0, n); ++n)
+            for (int n = 1; n < 9 && isFree(0, n); ++n)
             {
+                addMove(0, n);
             }
-            for (int n = 1; n < 9 && addMove(0, -n) && !isOpponent(0, -n); ++n)
+            for (int n = 1; n < 9 && isFree(0, -n); ++n)
             {
+                addMove(0, -n);
             }
-            for (int n = 1; n < 9 && addMove(n, 0) && !isOpponent(n, 0); ++n)
+            for (int n = 1; n < 9 && isFree(n, 0); ++n)
             {
+                addMove(n, 0);
             }
-            for (int n = 1; n < 9 && addMove(-n, 0) && !isOpponent(-n, 0); ++n)
+            for (int n = 1; n < 9 && isFree(-n, 0); ++n)
             {
+                addMove(-n, 0);
             }
             if (moving_piece != piece::Queen)
             {
@@ -227,19 +237,19 @@ public:
             }
 
         case piece::Bishop: // needed: coordinants to track bishop start {6,8}{3,8} white or {3,1}{6,1} black
-            for (int n = 1; n < 9 && !isOpponent(n, n); ++n)
+            for (int n = 1; n < 9 && isFree(n, n); ++n)
             {
                 addMove(n, n);
             }
-            for (int n = 1; n < 9 && !isOpponent(n, -n); ++n)
+            for (int n = 1; n < 9 && isFree(n, -n); ++n)
             {
                 addMove(n, -n);
             }
-            for (int n = 1; n < 9 && !isOpponent(-n, n); ++n)
+            for (int n = 1; n < 9 && isFree(-n, n); ++n)
             {
                 addMove(-n, n);
             }
-            for (int n = 1; n < 9 && !isOpponent(-n, -n); ++n)
+            for (int n = 1; n < 9 && isFree(-n, -n); ++n)
             {
                 addMove(-n, -n);
             }
@@ -414,17 +424,18 @@ public:
         {
             vertex<Pos> *i = possibleMoves(from.first);
             vertex<Pos>::edgeIterator j;
-            for (j = i->begin(); j != i->end(); j++)
+            for (j = i->begin(); j != NULL; j++)
             {
                 branch.makeMove(from.first, *j);
-                if (option.score > best_move.score && !minimize)
+                option.score = score(); 
+                if (option.score < best_move.score && minimize)
                 {
                     option = branch.minimax(depth - 1, minimize);
                     best_move.score = option.score;
                     best_move.from = from.first;
                     best_move.to = *j;
                 }
-                if (option.score < best_move.score && minimize)
+                if (option.score > best_move.score && !minimize)
                 {
                     option = branch.minimax(depth - 1, !minimize);
                     best_move.score = option.score;
