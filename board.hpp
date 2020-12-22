@@ -77,24 +77,37 @@ public:
     bool makeMove(Pos from, Pos to)
     {
         vertex<Pos> *allowed = new vertex<Pos>;
+        vertex<Pos>::edgeIterator item;
         allowed = possibleMoves(from);
+        bool mulligan = false;
 
         if (allowed->begin() == allowed->end())
         {
             return false;
         }
-
-        oppPieces().erase(to);
-        PC_Pieces()[to] = PC_Pieces()[from];
-        PC_Pieces().erase(from);
-        /*promotes paws to queen if @ end */
-        if ((PC_Pieces()[to] == piece::Pawn) && (to.y == 1 || to.y == 8))
+        // kind of trash solution
+        item = allowed->begin();
+        while (item != NULL)
         {
-            PC_Pieces()[to] = piece::Queen;
+            if(to == *item){
+                mulligan = true;
+                break;
+            }
+            item++;
         }
-        flipTurn();
+        if(mulligan == true){
+            // note for future ref if mem leak occurs
+            oppPieces().erase(to);
+            PC_Pieces()[to] = PC_Pieces()[from];
+            PC_Pieces().erase(from);
+            /*promotes paws to queen if @ end */
+            if ((PC_Pieces()[to] == piece::Pawn) && (to.y == 1 || to.y == 8)){
+                PC_Pieces()[to] = piece::Queen;
+            }
+            flipTurn();
+        }
         delete allowed;
-        return true;
+        return mulligan;
     };
 
     vertex<Pos> *possibleMoves(const Pos &from)
@@ -299,6 +312,7 @@ public:
     bool promptInput()
     {
         std::string move;
+        Pos from(-1, -1), to(-1, -1);
     illegalmove:
         if (play == player::white)
             std::cout << "White move: ";
@@ -332,7 +346,6 @@ public:
             move = "";
             goto illegalmove;
         }
-        Pos from(-1, -1), to(-1, -1);
         if (move.length() == 4)
         {
             from.x = move[0] - '0';
@@ -343,7 +356,7 @@ public:
         if (!makeMove(from, to)) // chess board issue 2, user peices make illegal moves
         {
             std::cout << "* Illegal move" << std::endl;
-            move = "";
+            move.clear();
             goto illegalmove;
         }
         printBoard();

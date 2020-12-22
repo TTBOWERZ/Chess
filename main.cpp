@@ -33,7 +33,6 @@ int main()
             game.printBoard();
         }
         while (gameon = game.promptInput()) // promptInput check for user illegal moves
-                                            // bug exists here
         {
             if (!game.hasKing()) // has king only works if king is got not a check or check mate
             {
