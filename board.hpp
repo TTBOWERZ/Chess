@@ -78,7 +78,7 @@ public:
     {
         vertex<Pos> *allowed = new vertex<Pos>;
         vertex<Pos>::edgeIterator item;
-        
+
         allowed = possibleMoves(from);
         bool mulligan = false;
         if (allowed->begin() == allowed->end())
@@ -123,7 +123,7 @@ public:
             {
                 return false;
             }
-            
+
             return true;
         };
 
@@ -363,7 +363,7 @@ public:
             to.x = move[2] - '0';
             to.y = move[3] - '0';
         }
-        if (!makeMove(from, to)) // chess board issue 2, user peices make illegal moves
+        if (!makeMove(from, to))
         {
             std::cout << "* Illegal move" << std::endl;
             move.clear();
@@ -396,17 +396,9 @@ public:
             {
                 return true;
             }
-        } // add condition for end game if King checked twice
-        return false;
-    };
-    /* bool kingPath(const Pos &from, int dx, int dy)
-    {
-        if (oppPieces().at(Pos(from, dx, dy)) == piece::King) // instead check if possible move 1 ahead is 4
-        {
-            return true;
         }
         return false;
-    };*/
+    };
 
     Move<Pos> minimax(int depth, bool minimize)
     {
@@ -427,15 +419,15 @@ public:
             for (j = i->begin(); j != NULL; j++)
             {
                 branch.makeMove(from.first, *j);
-                option.score = score(); 
-                if (option.score < best_move.score && minimize)
+                option.score = score();
+                if (option.score > best_move.score && !minimize)
                 {
                     option = branch.minimax(depth - 1, minimize);
                     best_move.score = option.score;
                     best_move.from = from.first;
                     best_move.to = *j;
                 }
-                if (option.score > best_move.score && !minimize)
+                if (option.score < best_move.score && minimize)
                 {
                     option = branch.minimax(depth - 1, !minimize);
                     best_move.score = option.score;
