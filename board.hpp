@@ -6,9 +6,14 @@
 #include <string>
 #include "vertex.hpp"
 
+/**
+ * @brief Represents a chess board and provides methods for move generation, input, and AI.
+ */
 class chessBoard
 {
-
+    enum class player { white, black };
+    enum class piece { King, Queen, Pawn, Rook, Bishop, Knight };
+    player play;
     template <class type>
     struct Move
     {
@@ -17,42 +22,28 @@ class chessBoard
     };
 
 public:
-    /*position struct*/
     class Pos
     {
     public:
         friend class chessBoard;
-        Pos(const Pos &p, int dx = 0, int dy = 0)
-        {
-            *this = p;
-            x += dx;
-            y += dy;
-        };
-        Pos(int _x, int _y)
-        {
-            x = _x;
-            y = _y;
-        };
-        bool operator<(const Pos &p) const { return (x < p.x) || (x == p.x && y < p.y); };
-        bool operator==(const Pos &p) const { return x == p.x && y == p.y; };
-        Pos()
-        {
-            x = -1;
-            y = -1;
-        };
-
-    private:
+        Pos(const Pos &p, int dx = 0, int dy = 0) { *this = p; x += dx; y += dy; }
+        Pos(int _x, int _y) : x(_x), y(_y) {}
+        bool operator<(const Pos &p) const { return (x < p.x) || (x == p.x && y < p.y); }
+        bool operator==(const Pos &p) const { return x == p.x && y == p.y; }
+        Pos() : x(-1), y(-1) {}
         int x, y;
     };
-    chessBoard()
+
+    chessBoard() { reset(); }
+    ~chessBoard() { reset(); }
+    chessBoard(const chessBoard &other)
     {
-        reset();
-    };
-    ~chessBoard()
-    {
-        reset();
-    };
-    /*reset board to default*/
+        play = other.play;
+        white_pieces = other.white_pieces;
+        black_pieces = other.black_pieces;
+        show_coordinates = other.show_coordinates;
+    }
+
     void reset()
     {
         play = player::white;
@@ -70,335 +61,311 @@ public:
             n++;
         }
         white_pieces[Pos(4, 8)] = black_pieces[Pos(4, 1)] = piece::Queen;
-    };
+    }
 
-    void flipTurn() { play = play == player::white ? player::black : player::white; };
+    void flipTurn() { play = play == player::white ? player::black : player::white; }
 
     bool makeMove(Pos from, Pos to)
     {
-        vertex<Pos> *allowed = new vertex<Pos>;
-        vertex<Pos>::edgeIterator item;
-
-        allowed = possibleMoves(from);
+        vertex<Pos> allowed = possibleMoves(from);
         bool mulligan = false;
-        if (allowed->begin() == allowed->end())
-        {
-            return false;
-        }
-        item = allowed->begin();
-        while (item != NULL)
+        for (auto item = allowed.begin(); item != allowed.end(); ++item)
         {
             if (to == *item)
             {
                 mulligan = true;
                 break;
             }
-            item++;
         }
-        if (mulligan == true)
+        if (mulligan)
         {
-            // actual peice movement
             oppPieces().erase(to);
             PC_Pieces()[to] = PC_Pieces()[from];
             PC_Pieces().erase(from);
-            /*promotes paws to queen if @ end */
             if ((PC_Pieces()[to] == piece::Pawn) && (to.y == 1 || to.y == 8))
             {
                 PC_Pieces()[to] = piece::Queen;
             }
             flipTurn();
         }
-        delete allowed;
         return mulligan;
-    };
+    }
 
-    vertex<Pos> *possibleMoves(const Pos &from)
+    vertex<Pos> possibleMoves(const Pos& from) const
     {
-        vertex<Pos> *moves = new vertex<Pos>;
+        vertex<Pos> moves;
         auto isOwn = [&](int dx, int dy) -> bool { return PC_Pieces().count(Pos(from, dx, dy)); };
         auto isOpponent = [&](int dx, int dy) -> bool { return oppPieces().count(Pos(from, dx, dy)); };
-        auto isInsideBoard = [&](int dx, int dy) -> bool { Pos p(from,dx,dy); return p.x < 9 && p.x > 0 && p.y < 9 && p.y > 0; };
+        auto isInsideBoard = [&](int dx, int dy) -> bool { Pos p(from, dx, dy); return p.x < 9 && p.x > 0 && p.y < 9 && p.y > 0; };
         auto isFree = [&](int dx, int dy) -> bool {
             if (isOwn(dx, dy) || !isInsideBoard(dx, dy) || isOpponent(dx, dy))
-            {
                 return false;
-            }
-
             return true;
         };
-
         auto addMove = [&](int dx, int dy) -> bool {
             if (isFree(dx, dy) || isOpponent(dx, dy))
             {
-                /*  if (kingPath(from, dx, dy))
-                {
-                    pieceV.at(piece::King) = 100000;
-                }*/
-                moves->addEdge(Pos(from, dx, dy));
+                moves.addEdge(Pos(from, dx, dy));
                 return true;
             }
             return false;
         };
-
-        if (!isOwn(0, 0))
-        {
-            return moves;
-        }
-
-        auto moving_piece = PC_Pieces()[from];
+        if (!isOwn(0, 0)) return moves;
+        auto moving_piece = PC_Pieces().at(from);
         switch (moving_piece)
         {
         case piece::Pawn:
             if (play == player::white)
             {
-                if (isFree(0, -1) && !isOpponent(0, -1))
-                {
-                    addMove(0, -1);
-                }
-                if (isFree(0, -1) && isFree(0, -2) && from.y == 7 && !isOpponent(0, -2))
-                {
-                    addMove(0, -2);
-                }
-                if (isOpponent(-1, -1))
-                {
-                    addMove(-1, -1);
-                }
-                if (isOpponent(1, -1))
-                {
-                    addMove(1, -1);
-                }
+                if (isFree(0, -1) && !isOpponent(0, -1)) addMove(0, -1);
+                if (isFree(0, -1) && isFree(0, -2) && from.y == 7 && !isOpponent(0, -2)) addMove(0, -2);
+                if (isOpponent(-1, -1)) addMove(-1, -1);
+                if (isOpponent(1, -1)) addMove(1, -1);
                 break;
             }
             if (play == player::black)
             {
-                if (isFree(0, 1) && !isOpponent(0, -1))
-                {
-                    addMove(0, 1);
-                }
-                if (isFree(0, 1) && isFree(0, 2) && from.y == 2 && !isOpponent(0, -1))
-                {
-                    addMove(0, 2);
-                }
-                if (isOpponent(-1, 1))
-                {
-                    addMove(-1, 1);
-                }
-                if (isOpponent(1, 1))
-                {
-                    addMove(1, 1);
-                }
+                if (isFree(0, 1) && !isOpponent(0, -1)) addMove(0, 1);
+                if (isFree(0, 1) && isFree(0, 2) && from.y == 2 && !isOpponent(0, -1)) addMove(0, 2);
+                if (isOpponent(-1, 1)) addMove(-1, 1);
+                if (isOpponent(1, 1)) addMove(1, 1);
                 break;
             }
-        case piece::Knight: // Knight position tracker start {2,1}{7,1} or {2,8}{7,8}
-            addMove(-2, -1);
-            addMove(-2, 1);
-            addMove(2, -1);
-            addMove(2, 1);
-            addMove(-1, -2);
-            addMove(-1, 2);
-            addMove(1, -2);
-            addMove(1, 2);
+        case piece::Knight:
+            addMove(-2, -1); addMove(-2, 1); addMove(2, -1); addMove(2, 1);
+            addMove(-1, -2); addMove(-1, 2); addMove(1, -2); addMove(1, 2);
             break;
-
         case piece::King:
             for (auto dy : {-1, 0, 1})
-            {
                 for (auto dx : {-1, 0, 1})
-                {
-                    if (isFree(dy, dx))
-                    {
-                        addMove(dy, dx);
-                    }
-                }
-            }
+                    if (isFree(dx, dy)) addMove(dx, dy);
             break;
-
         case piece::Queen:
+            // Rook-like moves
+            for (int n = 1; n < 9 && isFree(0, n); ++n) addMove(0, n);
+            for (int n = 1; n < 9 && isFree(0, -n); ++n) addMove(0, -n);
+            for (int n = 1; n < 9 && isFree(n, 0); ++n) addMove(n, 0);
+            for (int n = 1; n < 9 && isFree(-n, 0); ++n) addMove(-n, 0);
+            // Bishop-like moves
+            for (int n = 1; n < 9 && isFree(n, n); ++n) addMove(n, n);
+            for (int n = 1; n < 9 && isFree(n, -n); ++n) addMove(n, -n);
+            for (int n = 1; n < 9 && isFree(-n, n); ++n) addMove(-n, n);
+            for (int n = 1; n < 9 && isFree(-n, -n); ++n) addMove(-n, -n);
+            break;
         case piece::Rook:
-            for (int n = 1; n < 9 && isFree(0, n); ++n)
-            {
-                addMove(0, n);
-            }
-            for (int n = 1; n < 9 && isFree(0, -n); ++n)
-            {
-                addMove(0, -n);
-            }
-            for (int n = 1; n < 9 && isFree(n, 0); ++n)
-            {
-                addMove(n, 0);
-            }
-            for (int n = 1; n < 9 && isFree(-n, 0); ++n)
-            {
-                addMove(-n, 0);
-            }
-            if (moving_piece != piece::Queen)
-            {
-                break;
-            }
-
-        case piece::Bishop: // needed: coordinants to track bishop start {6,8}{3,8} white or {3,1}{6,1} black
-            for (int n = 1; n < 9 && isFree(n, n); ++n)
-            {
-                addMove(n, n);
-            }
-            for (int n = 1; n < 9 && isFree(n, -n); ++n)
-            {
-                addMove(n, -n);
-            }
-            for (int n = 1; n < 9 && isFree(-n, n); ++n)
-            {
-                addMove(-n, n);
-            }
-            for (int n = 1; n < 9 && isFree(-n, -n); ++n)
-            {
-                addMove(-n, -n);
-            }
+            for (int n = 1; n < 9 && isFree(0, n); ++n) addMove(0, n);
+            for (int n = 1; n < 9 && isFree(0, -n); ++n) addMove(0, -n);
+            for (int n = 1; n < 9 && isFree(n, 0); ++n) addMove(n, 0);
+            for (int n = 1; n < 9 && isFree(-n, 0); ++n) addMove(-n, 0);
+            if (moving_piece != piece::Queen) break;
+        case piece::Bishop:
+            for (int n = 1; n < 9 && isFree(n, n); ++n) addMove(n, n);
+            for (int n = 1; n < 9 && isFree(n, -n); ++n) addMove(n, -n);
+            for (int n = 1; n < 9 && isFree(-n, n); ++n) addMove(-n, n);
+            for (int n = 1; n < 9 && isFree(-n, -n); ++n) addMove(-n, -n);
             break;
         }
-
         return moves;
-    };
-    void printBoard() /*Modify in future to build graphic interface */
-    {
-        static std::map<piece, char> sprites =
-            {{piece::Pawn, 'P'},
-             {piece::Rook, 'R'},
-             {piece::Knight, 'N'},
-             {piece::Bishop, 'B'},
-             {piece::King, 'K'},
-             {piece::Queen, 'Q'}};
+    }
 
-        std::cout << '\n'
-                  << "        1     2     3     4     5     6     7     8   " << std::endl;
+    void printBoard()
+    {
+        static std::map<piece, char> sprites = {
+            {piece::Pawn, 'P'}, {piece::Rook, 'R'}, {piece::Knight, 'N'},
+            {piece::Bishop, 'B'}, {piece::King, 'K'}, {piece::Queen, 'Q'}
+        };
+        std::cout << '\n' << "        1     2     3     4     5     6     7     8   " << std::endl;
         std::cout << "      _____ _____ _____ _____ _____ _____ _____ _____ ";
         for (int y = 1; y < 9; ++y)
         {
             if (show_coordinates)
             {
-                std::cout << std::endl
-                          << "     |1" << y << "   |2" << y << "   |3" << y << "   |4" << y
+                std::cout << std::endl << "     |1" << y << "   |2" << y << "   |3" << y << "   |4" << y
                           << "   |5" << y << "   |6" << y << "   |7" << y << "   |8" << y << "   |";
             }
             else
             {
-                std::cout << std::endl
-                          << "     |     |     |     |     |     |     |     |     |";
+                std::cout << std::endl << "     |     |     |     |     |     |     |     |     |";
             }
-            std::cout << std::endl
-                      << "  " << y << "  ";
+            std::cout << std::endl << "  " << y << "  ";
             for (int x = 1; x < 9; ++x)
             {
                 std::cout << "|  ";
                 if (white_pieces.count(Pos(x, y)))
-                {
                     std::cout << (char)toupper(sprites[white_pieces[Pos(x, y)]]);
-                }
                 else if (black_pieces.count(Pos(x, y)))
-                {
                     std::cout << (char)tolower(sprites[black_pieces[Pos(x, y)]]);
-                }
                 else
-                {
                     std::cout << " ";
-                }
                 std::cout << "  ";
             }
-            std::cout << "|  " << y << std::endl
-                      << "     |_____|_____|_____|_____|_____|_____|_____|_____|";
+            std::cout << "|  " << y << std::endl << "     |_____|_____|_____|_____|_____|_____|_____|_____|";
         }
-        std::cout << std::endl
-                  << std::endl
-                  << "        1     2     3     4     5     6     7     8   " << std::endl
-                  << std::endl;
-    };
+        std::cout << std::endl << std::endl << "        1     2     3     4     5     6     7     8   " << std::endl << std::endl;
+    }
+
     void printHelp()
     {
         std::cout << std::endl
                   << "* h: help, q: quit, p: show board, c: toggle show coordinates inside squares" << std::endl
                   << "* Input format: yxyx is from-to coordinates, e.g: 1715 moves (x,y)=(1,7) to (x,y)=(1,5)\n"
                   << std::endl;
-    };
-    /* False to exit */
+    }
+
     bool promptInput()
     {
         std::string move;
         Pos from(-1, -1), to(-1, -1);
-    illegalmove:
-        if (play == player::white)
-            std::cout << "White move: ";
-        else
-            std::cout << "Black move: ";
-        if (move == "")
-            std::cin >> move;
-        if (move == "q")
+        while (true)
         {
-            std::cout << "Good bye" << std::endl
-                      << std::endl;
-            return false;
-        }
-        if (move == "?" || move == "h" || move == "help")
-        {
-            printHelp();
-            move = "";
-            goto illegalmove;
-        }
-        if (move == "c")
-        {
-            show_coordinates = !show_coordinates;
+            if (play == player::white)
+                std::cout << "White move: ";
+            else
+                std::cout << "Black move: ";
+            if (move == "")
+                std::cin >> move;
+            if (move == "q")
+            {
+                std::cout << "Good bye" << std::endl << std::endl;
+                return false;
+            }
+            if (move == "?" || move == "h" || move == "help")
+            {
+                printHelp();
+                move = "";
+                continue;
+            }
+            if (move == "c")
+            {
+                show_coordinates = !show_coordinates;
+                printBoard();
+                move = "";
+                continue;
+            }
+            if (move == "p")
+            {
+                printBoard();
+                move = "";
+                continue;
+            }
+            if (move.length() == 4)
+            {
+                from.x = move[0] - '0';
+                from.y = move[1] - '0';
+                to.x = move[2] - '0';
+                to.y = move[3] - '0';
+            }
+            if (!makeMove(from, to))
+            {
+                std::cout << "* Illegal move" << std::endl;
+                move = "";
+                continue;
+            }
             printBoard();
-            move = "";
-            goto illegalmove;
+            return true;
         }
-
-        if (move == "p")
-        {
-            printBoard();
-            move = "";
-            goto illegalmove;
-        }
-        if (move.length() == 4)
-        {
-            from.x = move[0] - '0';
-            from.y = move[1] - '0';
-            to.x = move[2] - '0';
-            to.y = move[3] - '0';
-        }
-        if (!makeMove(from, to))
-        {
-            std::cout << "* Illegal move" << std::endl;
-            move.clear();
-            goto illegalmove;
-        }
-        printBoard();
-        return true;
-    };
+    }
 
     int score()
     {
-        int sumWhite = 0;
-        int sumBlack = 0;
-        for (auto &p : white_pieces)
-        {
-            sumWhite += pieceV[p.second];
-        }
-        for (auto &p : black_pieces)
-        {
-            sumBlack += pieceV[p.second];
-        }
+        int sumWhite = 0, sumBlack = 0;
+        for (const auto &p : white_pieces) sumWhite += pieceV[p.second];
+        for (const auto &p : black_pieces) sumBlack += pieceV[p.second];
         return sumWhite - sumBlack;
-    };
+    }
 
     bool hasKing()
     {
-        for (auto &p : PC_Pieces())
+        for (const auto &p : PC_Pieces())
+            if (p.second == piece::King) return true;
+        return false;
+    }
+
+    bool oppHasKing() const
+    {
+        for (const auto& p : oppPieces())
+            if (p.second == piece::King) return true;
+        return false;
+    }
+
+    // --- Check and Checkmate Detection ---
+
+    /**
+     * @brief Checks if the current player's king is in check.
+     * @return true if in check, false otherwise.
+     */
+    bool isInCheck() const
+    {
+        // Find current player's king position
+        Pos kingPos;
+        for (const auto& p : PC_Pieces())
         {
-            if (p.second == piece::King) // instead check if possible move 1 ahead is 4
+            if (p.second == piece::King)
             {
-                return true;
+                kingPos = p.first;
+                break;
+            }
+        }
+        // For each opponent piece, see if it can move to king's position
+        for (const auto& p : oppPieces())
+        {
+            vertex<Pos> moves = possibleMoves(p.first);
+            for (auto it = moves.begin(); it != moves.end(); ++it)
+            {
+                if (*it == kingPos)
+                    return true;
             }
         }
         return false;
-    };
+    }
+
+    /**
+     * @brief Checks if the current player is in checkmate.
+     * @return true if in checkmate, false otherwise.
+     */
+    bool isCheckmate()
+    {
+        if (!isInCheck()) return false;
+        // Try all possible moves for current player
+        for (const auto& p : PC_Pieces())
+        {
+            vertex<Pos> moves = possibleMoves(p.first);
+            for (auto it = moves.begin(); it != moves.end(); ++it)
+            {
+                chessBoard testBoard = *this;
+                if (testBoard.makeMove(p.first, *it))
+                {
+                    if (!testBoard.isInCheck())
+                        return false; // Found a move that escapes check
+                }
+            }
+        }
+        return true; // No move escapes check
+    }
+
+    /**
+     * @brief Checks if the opponent is in check.
+     * @return true if opponent is in check, false otherwise.
+     */
+    bool isOpponentInCheck()
+    {
+        flipTurn();
+        bool result = isInCheck();
+        flipTurn();
+        return result;
+    }
+
+    /**
+     * @brief Checks if the opponent is in checkmate.
+     * @return true if opponent is in checkmate, false otherwise.
+     */
+    bool isOpponentCheckmate()
+    {
+        flipTurn();
+        bool result = isCheckmate();
+        flipTurn();
+        return result;
+    }
 
     Move<Pos> minimax(int depth, bool minimize)
     {
@@ -411,12 +378,10 @@ public:
             best_move.score = score();
             return best_move;
         }
-
         for (auto &from : PC_Pieces())
         {
-            vertex<Pos> *i = possibleMoves(from.first);
-            vertex<Pos>::edgeIterator j;
-            for (j = i->begin(); j != NULL; j++)
+            vertex<Pos> moves = possibleMoves(from.first);
+            for (auto j = moves.begin(); j != moves.end(); ++j)
             {
                 branch.makeMove(from.first, *j);
                 option.score = score();
@@ -435,51 +400,36 @@ public:
                     best_move.to = *j;
                 }
             }
-            delete i;
         }
         return best_move;
-    };
+    }
+
     void AIMove()
     {
         bool minimize = play == player::black ? true : false;
         Move<Pos> m = minimax(4, minimize);
         makeMove(m.from, m.to);
         printBoard();
-    };
+    }
 
 private:
-    enum class player
-    {
-        white,
-        black
-    } play;
-    enum class piece
-    {
-        King,
-        Queen,
-        Pawn,
-        Rook,
-        Bishop,
-        Knight
-    };
-    // myStack<Pos> stacker;
-    // vertex<Pos> *vert;
-    std::string Knight[4] = {"21", "71", "28", "78"}; // used to track Knight pos for intelligent movement
-                                                      // not yet implemented
-    std::string Bishop[4] = {"31", "61", "38", "68"}; // used to track Bishop pos for intelligent movement
-                                                      // not yet implemented
+    std::string Knight[4] = {"21", "71", "28", "78"}; // not yet implemented
+    std::string Bishop[4] = {"31", "61", "38", "68"}; // not yet implemented
     bool show_coordinates = false;
     std::map<Pos, piece> white_pieces, black_pieces;
-    std::map<Pos, piece> &PC_Pieces() { return play == player::white ? white_pieces : black_pieces; };
-    std::map<Pos, piece> &oppPieces() { return play == player::white ? black_pieces : white_pieces; };
+
+    std::map<Pos, piece> &PC_Pieces() { return play == player::white ? white_pieces : black_pieces; }
+    std::map<Pos, piece> &oppPieces() { return play == player::white ? black_pieces : white_pieces; }
+    const std::map<Pos, piece>& PC_Pieces() const { return play == player::white ? white_pieces : black_pieces; }
+    const std::map<Pos, piece>& oppPieces() const { return play == player::white ? black_pieces : white_pieces; }
+
     std::map<piece, int> pieceV{
-        // attack values
-        {chessBoard::piece::King, 4},
-        {chessBoard::piece::Queen, 9},
-        {chessBoard::piece::Pawn, 1},
-        {chessBoard::piece::Bishop, 3},
-        {chessBoard::piece::Knight, 3},
-        {chessBoard::piece::Rook, 5},
+        {piece::King, 4},
+        {piece::Queen, 9},
+        {piece::Pawn, 1},
+        {piece::Bishop, 3},
+        {piece::Knight, 3},
+        {piece::Rook, 5},
     };
 };
 

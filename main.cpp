@@ -32,21 +32,26 @@ int main()
         {
             game.printBoard();
         }
-        while (gameon = game.promptInput()) // promptInput check for user illegal moves
+        while ((gameon = game.promptInput()))
         {
-            if (!game.hasKing()) // has king only works if king is got not a check or check mate
-            {
-                std::cout << " You Win!" << std::endl;
+            // After player's move, check opponent's state
+            if (game.isOpponentCheckmate()) {
+                std::cout << "You win by checkmate!" << std::endl;
                 break;
+            } else if (game.isOpponentInCheck()) {
+                std::cout << "Opponent is in check!" << std::endl;
             }
+
             game.AIMove();
-            if (!game.hasKing()) // has king only works if king is got not a check or check mate
-            {
-                std::cout << " You Lost!" << std::endl;
+
+            // After AI's move, check player's state
+            if (game.isCheckmate()) {
+                std::cout << "Checkmate! You lost!" << std::endl;
                 break;
+            } else if (game.isInCheck()) {
+                std::cout << "Check!" << std::endl;
             }
         }
     }
-
     return 0;
 }
